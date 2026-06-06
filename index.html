@@ -3,128 +3,480 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, maximum-scale=1.0, user-scalable=no">
-    <title>Card Wallet - Vercel KV 版</title>
+    <title>Card Wallet</title>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; padding: 20px; max-width: 500px; margin: 0 auto; }
-        input, select, button { padding: 10px; margin: 5px 0; border-radius: 8px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; font-size: 16px; background: white; }
-        .primary { background: #000; color: #fff; border: none; font-weight: bold; }
-        .secondary { background: #f0f0f0; }
-        .card-item { background: #f9f9f9; padding: 15px; margin-top: 10px; border-radius: 8px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
-        .render-btn { width: auto; background: #007aff; color: white; border: none; padding: 8px 15px; }
-        #barcode-container { text-align: center; margin: 20px 0; display: none; }
-        .auth-box { background: #eef2f7; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f2f2f7;
+            min-height: 100vh;
+            padding-bottom: 40px;
+        }
+
+        /* ── Header ── */
+        header {
+            background: #fff;
+            border-bottom: 1px solid #e5e5ea;
+            padding: 16px 20px 12px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .header-row { display: flex; align-items: center; justify-content: space-between; }
+        header h1 { font-size: 22px; font-weight: 700; }
+
+        /* sync pill */
+        #sync-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            font-weight: 500;
+            padding: 4px 10px;
+            border-radius: 20px;
+            transition: background 0.3s, color 0.3s;
+        }
+        #sync-pill.idle    { background: #e5e5ea; color: #636366; }
+        #sync-pill.syncing { background: #e5e5ea; color: #636366; }
+        #sync-pill.ok      { background: #d1f5e0; color: #1c8a3f; }
+        #sync-pill.error   { background: #ffe5e5; color: #c0392b; }
+
+        .spinner {
+            width: 10px; height: 10px;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            display: none;
+        }
+        #sync-pill.syncing .spinner { display: inline-block; }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Toast ── */
+        #toast {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+            background: #1c1c1e; color: #fff;
+            padding: 10px 18px; border-radius: 20px;
+            font-size: 14px; font-weight: 500;
+            opacity: 0; transition: opacity 0.25s;
+            pointer-events: none; white-space: nowrap;
+            z-index: 100;
+        }
+        #toast.show { opacity: 1; }
+
+        /* ── Section card ── */
+        .section {
+            background: #fff;
+            border-radius: 12px;
+            margin: 16px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,.06);
+        }
+        .section-title {
+            font-size: 13px; font-weight: 600; color: #8e8e93;
+            text-transform: uppercase; letter-spacing: .5px;
+            padding: 12px 16px 6px;
+        }
+
+        /* ── Auth ── */
+        .auth-row {
+            display: flex; gap: 8px; padding: 12px 16px;
+            border-top: 1px solid #f2f2f7;
+        }
+        .auth-row input {
+            flex: 1; padding: 10px 12px;
+            border: 1px solid #e5e5ea; border-radius: 10px;
+            font-size: 15px; background: #f9f9fb;
+            outline: none;
+        }
+        .auth-row input:focus { border-color: #007aff; }
+        .btn-sync {
+            padding: 10px 16px; border-radius: 10px;
+            background: #007aff; color: #fff;
+            border: none; font-size: 15px; font-weight: 600;
+            cursor: pointer; white-space: nowrap;
+        }
+        .btn-sync:active { opacity: 0.8; }
+
+        /* ── Add card form ── */
+        .form-field {
+            padding: 0 16px 4px;
+        }
+        .form-field + .form-field { border-top: 1px solid #f2f2f7; }
+        .form-field input, .form-field select {
+            width: 100%; padding: 12px 0;
+            border: none; font-size: 16px; background: transparent;
+            outline: none; color: #1c1c1e;
+            -webkit-appearance: none;
+        }
+        .form-field select { color: #1c1c1e; }
+        .btn-add {
+            display: block; width: calc(100% - 32px);
+            margin: 12px 16px; padding: 13px;
+            background: #000; color: #fff;
+            border: none; border-radius: 12px;
+            font-size: 16px; font-weight: 600; cursor: pointer;
+        }
+        .btn-add:active { opacity: 0.75; }
+
+        /* ── Barcode panel ── */
+        #barcode-container {
+            display: none;
+            padding: 20px 16px;
+            text-align: center;
+            border-top: 1px solid #f2f2f7;
+        }
+        #barcode-container.visible { display: block; }
+        #display-name { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+        #barcode-canvas { max-width: 100%; }
+        .barcode-actions {
+            display: flex; gap: 8px; justify-content: center; margin-top: 12px;
+        }
+        .btn-close-barcode {
+            padding: 8px 20px;
+            background: #f2f2f7; border: none; border-radius: 8px;
+            font-size: 14px; color: #636366; cursor: pointer;
+        }
+        .btn-brightness {
+            padding: 8px 14px; border-radius: 8px; border: none;
+            font-size: 14px; font-weight: 500; cursor: pointer;
+        }
+        .btn-brightness.max { background: #fff3cd; color: #856404; }
+        .btn-brightness.restore { background: #d1f5e0; color: #1c8a3f; display: none; }
+
+        /* ── Card list items ── */
+        .card-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 16px;
+        }
+        .card-item + .card-item { border-top: 1px solid #f2f2f7; }
+        .card-info strong { font-size: 16px; color: #1c1c1e; }
+        .card-info small { display: block; font-size: 13px; color: #8e8e93; margin-top: 2px; }
+        .card-actions { display: flex; gap: 8px; }
+        .btn-show {
+            padding: 7px 14px; border-radius: 8px;
+            background: #007aff; color: #fff;
+            border: none; font-size: 14px; font-weight: 500; cursor: pointer;
+        }
+        .btn-delete {
+            padding: 7px 10px; border-radius: 8px;
+            background: #ffe5e5; color: #c0392b;
+            border: none; font-size: 14px; cursor: pointer;
+        }
+        .btn-show:active, .btn-delete:active { opacity: 0.75; }
+
+        .empty-state { padding: 24px 16px; text-align: center; color: #8e8e93; font-size: 15px; }
+
+        /* cache badge */
+        .cache-badge {
+            display: inline-block;
+            font-size: 11px; font-weight: 500;
+            background: #fff3cd; color: #856404;
+            padding: 2px 7px; border-radius: 6px; margin-left: 6px;
+        }
     </style>
 </head>
 <body>
 
-    <div class="auth-box">
-        <input type="password" id="appPassword" placeholder="输入访问密码" autocomplete="current-password" />
-        <button class="primary" onclick="loadCardsFromServer()">🔐 验证并同步云端数据</button>
+<header>
+    <div class="header-row">
+        <h1>我的卡包</h1>
+        <div id="sync-pill" class="idle">
+            <div class="spinner"></div>
+            <span id="sync-text">未同步</span>
+        </div>
     </div>
+</header>
 
-    <h2>添加新卡片</h2>
-    <input type="text" id="cardName" placeholder="例如: T&T Supermarket" />
-    <input type="number" id="cardNumber" placeholder="例如: 41012345678" />
-    <select id="cardFormat">
-        <option value="UPC">UPC-A (需 11/12 位数字)</option>
-        <option value="CODE128">Code 128 (通用)</option>
-        <option value="EAN13">EAN 13 (需 12/13 位数字)</option>
-    </select>
-    <button class="primary" onclick="addCard()">保存并同步到 Vercel</button>
+<div id="toast"></div>
 
-    <div id="barcode-container">
-        <h3 id="display-name"></h3>
+<!-- Auth -->
+<div class="section">
+    <div class="section-title">云端同步</div>
+    <div class="auth-row">
+        <input type="password" id="appPassword" placeholder="访问密码" autocomplete="current-password" />
+        <button class="btn-sync" onclick="syncFromServer()">同步</button>
+    </div>
+</div>
+
+<!-- Add card -->
+<div class="section">
+    <div class="section-title">添加新卡片</div>
+    <div class="form-field">
+        <input type="text" id="cardName" placeholder="卡片名称，例如 T&T Supermarket" />
+    </div>
+    <div class="form-field">
+        <input type="number" id="cardNumber" placeholder="卡号，例如 41012345678" />
+    </div>
+    <div class="form-field">
+        <select id="cardFormat">
+            <option value="CODE128">Code 128（通用，推荐）</option>
+            <option value="UPC">UPC-A（需 11/12 位数字）</option>
+            <option value="EAN13">EAN-13（需 12/13 位数字）</option>
+        </select>
+    </div>
+    <button class="btn-add" onclick="addCard()">+ 保存并同步到云端</button>
+</div>
+
+<!-- Barcode display -->
+<div class="section" id="barcode-section" style="display:none;">
+    <div id="barcode-container" class="visible">
+        <div id="display-name"></div>
         <svg id="barcode-canvas"></svg>
+        <div class="barcode-actions">
+            <button class="btn-brightness max"     id="btn-bright-max"     onclick="setBrightMax()">☀️ 最亮</button>
+            <button class="btn-brightness restore"  id="btn-bright-restore" onclick="restoreBrightness()">↩ 恢复亮度</button>
+            <button class="btn-close-barcode" onclick="closeBarcode()">关闭</button>
+        </div>
     </div>
+</div>
 
-    <hr>
-    <h2>我的卡包</h2>
-    <div id="card-list"></div>
+<!-- Card list -->
+<div class="section">
+    <div class="section-title" id="list-title">卡包</div>
+    <div id="card-list">
+        <div class="empty-state">暂无卡片</div>
+    </div>
+</div>
 
-    <script>
-        let localCards = [];
+<script>
+    const CACHE_KEY   = 'cw_cards_cache';
+    const CACHE_TS_KEY = 'cw_cache_ts';
+    const PWD_KEY     = 'wallet_pwd';
 
-        window.onload = function() {
-            const savedPassword = localStorage.getItem('wallet_pwd');
-            if (savedPassword) {
-                document.getElementById('appPassword').value = savedPassword;
-                loadCardsFromServer();
-            }
-        };
+    let localCards = [];
+    let fromCache  = false;
 
-        function getPassword() {
-            return document.getElementById('appPassword').value.trim();
-        }
-
-        async function loadCardsFromServer() {
-            const password = getPassword();
-            if (!password) return alert('请输入密码');
-
+    // ── Boot ──────────────────────────────────────────────────
+    window.onload = function () {
+        // Show cached cards immediately
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
             try {
-                const res = await fetch('/api/get-cards', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password })
-                });
-                const data = await res.json();
-                if (res.ok) {
-                    localCards = data.cards;
-                    localStorage.setItem('wallet_pwd', password);
-                    updateCardList();
-                } else {
-                    alert(data.error || '同步失败');
-                }
-            } catch (e) { alert('网络错误: ' + e.message); }
+                localCards = JSON.parse(cached);
+                fromCache  = true;
+                renderCards();
+                const ts = localStorage.getItem(CACHE_TS_KEY);
+                setSyncPill('idle', '缓存 · ' + relativeTime(+ts));
+            } catch (e) { /* ignore */ }
         }
 
-        async function addCard() {
-            const password = getPassword();
-            const name = document.getElementById('cardName').value.trim();
-            const number = document.getElementById('cardNumber').value.trim();
-            const format = document.getElementById('cardFormat').value;
-
-            if (!password) return alert('请先输入密码验证状态');
-            if (!name || !number) return alert('请完整填写卡片信息');
-
-            localCards.push({ name, number, format });
-            updateCardList();
-            renderBarcode(name, number, format);
-
-            document.getElementById('cardName').value = '';
-            document.getElementById('cardNumber').value = '';
-
-            try {
-                const res = await fetch('/api/save-cards', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password, cards: localCards })
-                });
-                if (!res.ok) alert('保存到云端失败，请检查密码');
-            } catch (e) { alert('云端同步失败: ' + e.message); }
+        // Auto-sync if password is saved
+        const savedPwd = localStorage.getItem(PWD_KEY);
+        if (savedPwd) {
+            document.getElementById('appPassword').value = savedPwd;
+            syncFromServer(true);
         }
+    };
 
-        function updateCardList() {
-            const listDiv = document.getElementById('card-list');
-            listDiv.innerHTML = localCards.length === 0 ? '<p style="color: #999;">暂无卡片，请先输入密码同步</p>' : '';
-            localCards.forEach((card) => {
-                const item = document.createElement('div');
-                item.className = 'card-item';
-                item.innerHTML =
-                    '<div><strong>' + card.name + '</strong><br><small>' + card.number + ' (' + card.format + ')</small></div>' +
-                    '<button class="render-btn" onclick="renderBarcode(\'' + card.name + '\', \'' + card.number + '\', \'' + card.format + '\')">显示</button>';
-                listDiv.appendChild(item);
+    // ── Sync status pill ──────────────────────────────────────
+    function setSyncPill(state, text) {
+        const pill = document.getElementById('sync-pill');
+        pill.className = state;
+        document.getElementById('sync-text').textContent = text;
+    }
+
+    function relativeTime(ts) {
+        if (!ts) return '';
+        const diff = Math.round((Date.now() - ts) / 1000);
+        if (diff < 10)  return '刚刚';
+        if (diff < 60)  return diff + '秒前';
+        if (diff < 3600) return Math.round(diff / 60) + '分钟前';
+        return Math.round(diff / 3600) + '小时前';
+    }
+
+    // ── Toast ─────────────────────────────────────────────────
+    let toastTimer;
+    function toast(msg) {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+    }
+
+    // ── Server sync ───────────────────────────────────────────
+    async function syncFromServer(silent = false) {
+        const password = document.getElementById('appPassword').value.trim();
+        if (!password) { if (!silent) toast('请输入密码'); return; }
+
+        setSyncPill('syncing', '同步中…');
+        try {
+            const res  = await fetch('/api/get-cards', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
             });
+            const data = await res.json();
+            if (res.ok) {
+                localCards = data.cards;
+                fromCache  = false;
+                localStorage.setItem(PWD_KEY, password);
+                saveCache();
+                renderCards();
+                setSyncPill('ok', '已同步 ✓');
+                if (!silent) toast('同步成功，共 ' + localCards.length + ' 张卡片');
+            } else {
+                setSyncPill('error', '同步失败');
+                toast(data.error || '同步失败');
+            }
+        } catch (e) {
+            setSyncPill('error', '网络错误');
+            toast('网络错误');
+        }
+    }
+
+    // ── Add card ──────────────────────────────────────────────
+    async function addCard() {
+        const password = document.getElementById('appPassword').value.trim();
+        const name     = document.getElementById('cardName').value.trim();
+        const number   = document.getElementById('cardNumber').value.trim();
+        const format   = document.getElementById('cardFormat').value;
+
+        if (!password) return toast('请先输入密码');
+        if (!name || !number) return toast('请填写卡片名称和卡号');
+
+        const card = { name, number, format };
+        localCards.push(card);
+        fromCache = false;
+        renderCards();
+        renderBarcode(name, number, format);
+        document.getElementById('cardName').value  = '';
+        document.getElementById('cardNumber').value = '';
+        saveCache();
+
+        setSyncPill('syncing', '保存中…');
+        try {
+            const res = await fetch('/api/save-cards', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, cards: localCards })
+            });
+            if (res.ok) {
+                setSyncPill('ok', '已同步 ✓');
+                toast('已保存');
+            } else {
+                setSyncPill('error', '保存失败');
+                toast('云端保存失败，请检查密码');
+            }
+        } catch (e) {
+            setSyncPill('error', '网络错误');
+            toast('网络错误，卡片已存到本地缓存');
+        }
+    }
+
+    // ── Delete card ───────────────────────────────────────────
+    async function deleteCard(index) {
+        const password = document.getElementById('appPassword').value.trim();
+        localCards.splice(index, 1);
+        renderCards();
+        saveCache();
+
+        if (!password) { toast('已从本地删除，请同步到云端'); return; }
+
+        setSyncPill('syncing', '保存中…');
+        try {
+            const res = await fetch('/api/save-cards', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, cards: localCards })
+            });
+            if (res.ok) {
+                setSyncPill('ok', '已同步 ✓');
+                toast('卡片已删除');
+            } else {
+                setSyncPill('error', '保存失败');
+                toast('本地已删除，云端保存失败');
+            }
+        } catch (e) {
+            setSyncPill('error', '网络错误');
+            toast('本地已删除，请稍后重新同步');
+        }
+    }
+
+    // ── Local cache ───────────────────────────────────────────
+    function saveCache() {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(localCards));
+        localStorage.setItem(CACHE_TS_KEY, Date.now());
+    }
+
+    // ── Render ────────────────────────────────────────────────
+    function renderCards() {
+        const listDiv = document.getElementById('card-list');
+        const title   = document.getElementById('list-title');
+
+        const badge = fromCache
+            ? '<span class="cache-badge">缓存</span>'
+            : '';
+        title.innerHTML = '卡包 (' + localCards.length + ')' + badge;
+
+        if (localCards.length === 0) {
+            listDiv.innerHTML = '<div class="empty-state">暂无卡片</div>';
+            return;
         }
 
-        function renderBarcode(name, number, format) {
-            const container = document.getElementById('barcode-container');
-            document.getElementById('display-name').textContent = name;
-            container.style.display = 'block';
-            try {
-                JsBarcode("#barcode-canvas", number, { format: format, lineColor: "#000", width: 2.5, height: 100, displayValue: true });
-            } catch (e) { alert('条码渲染失败，请检查卡号与格式是否匹配'); }
+        listDiv.innerHTML = '';
+        localCards.forEach((card, i) => {
+            const item = document.createElement('div');
+            item.className = 'card-item';
+            item.innerHTML =
+                '<div class="card-info">' +
+                    '<strong>' + escHtml(card.name) + '</strong>' +
+                    '<small>' + escHtml(card.number) + ' · ' + card.format + '</small>' +
+                '</div>' +
+                '<div class="card-actions">' +
+                    '<button class="btn-show" onclick="renderBarcode(\'' + escAttr(card.name) + '\',\'' + escAttr(card.number) + '\',\'' + card.format + '\')">显示</button>' +
+                    '<button class="btn-delete" onclick="deleteCard(' + i + ')">✕</button>' +
+                '</div>';
+            listDiv.appendChild(item);
+        });
+    }
+
+    function renderBarcode(name, number, format) {
+        const section = document.getElementById('barcode-section');
+        section.style.display = 'block';
+        document.getElementById('display-name').textContent = name;
+        try {
+            JsBarcode('#barcode-canvas', number, {
+                format, lineColor: '#000', width: 2.5, height: 100, displayValue: true
+            });
+        } catch (e) {
+            toast('条码渲染失败，请检查卡号与格式是否匹配');
+            section.style.display = 'none';
         }
-    </script>
+        section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    function closeBarcode() {
+        restoreBrightness();
+        document.getElementById('barcode-section').style.display = 'none';
+    }
+
+    // ── Brightness ────────────────────────────────────────────
+    let prevBrightness = null;
+
+    function setBrightMax() {
+        // Capture current filter (if any) so we can restore it
+        prevBrightness = document.documentElement.style.filter || '';
+        document.documentElement.style.filter = 'brightness(2)';
+        document.getElementById('btn-bright-max').style.display     = 'none';
+        document.getElementById('btn-bright-restore').style.display = 'inline-block';
+    }
+
+    function restoreBrightness() {
+        if (prevBrightness !== null) {
+            document.documentElement.style.filter = prevBrightness;
+            prevBrightness = null;
+        }
+        document.getElementById('btn-bright-max').style.display     = 'inline-block';
+        document.getElementById('btn-bright-restore').style.display = 'none';
+    }
+
+    function escHtml(s)  { return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function escAttr(s)  { return s.replace(/'/g, "\\'"); }
+</script>
 </body>
 </html>
