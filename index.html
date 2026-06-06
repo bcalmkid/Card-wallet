@@ -2,8 +2,8 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Card Wallet - 永久配置版</title>
+    <meta name="viewport" content="width=device-width, maximum-scale=1.0, user-scalable=no">
+    <title>Card Wallet - Vercel KV 版</title>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; max-width: 500px; margin: 0 auto; }
@@ -13,24 +13,25 @@
         .card-item { background: #f9f9f9; padding: 15px; margin-top: 10px; border-radius: 8px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
         .render-btn { width: auto; background: #007aff; color: white; border: none; padding: 8px 15px; }
         #barcode-container { text-align: center; margin: 20px 0; display: none; }
-        .notice { font-size: 13px; color: #666; background: #fff9e6; border: 1px solid #ffe599; padding: 10px; border-radius: 8px; margin: 10px 0; display: none; }
+        .auth-box { background: #eef2f7; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
+    <div class="auth-box">
+        <input type="password" id="appPassword" placeholder="输入访问密码" autocomplete="current-password" />
+        <button class="primary" onclick="loadCardsFromServer()">🔐 验证并同步云端数据</button>
+    </div>
+
     <h2>添加新卡片</h2>
     <input type="text" id="cardName" placeholder="例如: T&T Supermarket" />
     <input type="number" id="cardNumber" placeholder="例如: 41012345678" />
-    
     <select id="cardFormat">
         <option value="UPC">UPC-A (需 11/12 位数字)</option>
-        <option value="CODE128">Code 128 (通用，支持任意长度)</option>
+        <option value="CODE128">Code 128 (通用)</option>
         <option value="EAN13">EAN 13 (需 12/13 位数字)</option>
-        <option value="EAN8">EAN 8 (需 7/8 位数字)</option>
-        <option value="CODE39">Code 39</option>
     </select>
-
-    <button class="primary" onclick="addAndRenderCard()">保存并生成条形码</button>
+    <button class="primary" onclick="addCard()">保存并同步到 Vercel</button>
 
     <div id="barcode-container">
         <h3 id="display-name"></h3>
@@ -38,171 +39,92 @@
     </div>
 
     <hr>
-
     <h2>我的卡包</h2>
     <div id="card-list"></div>
 
-    <hr>
-
-    <h3>云端同步 (GitHub Gist)</h3>
-    <div id="url-notice" class="notice"></div>
-    
-    <div style="background: #f0f0f0; padding: 15px; border-radius: 8px; margin-bottom: 10px;">
-        <input type="password" id="ghToken" placeholder="输入 GitHub Token (ghp_...)" />
-        <input type="text" id="ghGistId" placeholder="输入 Gist ID" />
-        <button class="primary" onclick="generateSecretUrl()">🔗 生成专属永久链接</button>
-    </div>
-
-    <div style="display: flex; gap: 10px;">
-        <button class="secondary" style="flex: 1;" onclick="uploadToGithub()">↑ 上传到云端</button>
-        <button class="secondary" style="flex: 1;" onclick="downloadFromGithub()">↓ 从云端恢复</button>
-    </div>
-
     <script>
-        const STORAGE_KEY = 'my_cards_data';
-        const GITHUB_CONFIG_KEY = 'github_settings';
+        let localCards = [];
 
-        // --- 1. 核心逻辑：初始化时检测 URL 参数 ---
         window.onload = function() {
-            // 解析 URL 里的 #gist=...&token=...
-            const hash = window.location.hash.substring(1);
-            const params = new URLSearchParams(hash);
-            const urlToken = params.get('token');
-            const urlGist = params.get('gist');
-
-            if (urlToken && urlGist) {
-                // 发现参数，注入并覆盖本地 localStorage
-                localStorage.setItem(GITHUB_CONFIG_KEY, JSON.stringify({ token: urlToken, gistId: urlGist }));
-                
-                // 自动执行一次同步恢复
-                downloadFromGithub();
-                
-                // 清理浏览器地址栏，隐藏敏感凭证（防止你截图或分享链接时泄露）
-                window.history.replaceState(null, null, window.location.pathname);
-            } else {
-                // 如果没有参数，正常加载本地已有配置
-                loadGithubSettings();
-                updateCardList();
+            const savedPassword = localStorage.getItem('wallet_pwd');
+            if (savedPassword) {
+                document.getElementById('appPassword').value = savedPassword;
+                loadCardsFromServer();
             }
         };
 
-        // 生成带有凭证的永久链接
-        function generateSecretUrl() {
-            const token = document.getElementById('ghToken').value.trim();
-            const gistId = document.getElementById('ghGistId').value.trim();
-
-            if (!token || !gistId) return alert('请先输入 Token 和 Gist ID');
-
-            // 存入本地
-            localStorage.setItem(GITHUB_CONFIG_KEY, JSON.stringify({ token, gistId }));
-
-            // 构造带参数的 URL
-            const baseUrl = window.location.href.split('#')[0];
-            const secretUrl = `${baseUrl}#gist=${gistId}&token=${token}`;
-
-            // 显示给用户
-            const noticeDiv = document.getElementById('url-notice');
-            noticeDiv.style.display = 'block';
-            noticeDiv.innerHTML = `
-                <strong>专属链接已生成：</strong><br>
-                <a href="${secretUrl}" target="_blank" style="word-break: break-all; font-size: 11px;">${secretUrl}</a><br><br>
-                <strong>iOS 操作指南：</strong><br>
-                1. 点击上方链接打开这个带参数的新页面。<br>
-                2. 在 Safari 中点击<strong>“分享”按钮 -> “添加到主屏幕”</strong>。<br>
-                3. 以后只需从主屏幕打开，即可永久自动绑定，再也不怕缓存清理！
-            `;
+        function getPassword() {
+            return document.getElementById('appPassword').value.trim();
         }
 
-        function loadGithubSettings() {
-            const settings = JSON.parse(localStorage.getItem(GITHUB_CONFIG_KEY) || '{}');
-            if (settings.token) document.getElementById('ghToken').value = settings.token;
-            if (settings.gistId) document.getElementById('ghGistId').value = settings.gistId;
-        }
+        async function loadCardsFromServer() {
+            const password = getPassword();
+            if (!password) return alert('请输入密码');
 
-        // --- 条形码渲染与存储 ---
-        function renderBarcode(name, number, format) {
-            const container = document.getElementById('barcode-container');
-            const nameDisplay = document.getElementById('display-name');
-            nameDisplay.textContent = `${name} (${format})`;
-            container.style.display = 'block';
             try {
-                JsBarcode("#barcode-canvas", number, {
-                    format: format, lineColor: "#000", width: 2.5, height: 100, displayValue: true, fontSize: 20
+                const res = await fetch('/api/get-cards', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
                 });
-            } catch (e) {
-                alert(`条形码生成失败。请检查该格式的长度要求。`);
-                container.style.display = 'none';
-            }
+                const data = await res.json();
+                if (res.ok) {
+                    localCards = data.cards;
+                    localStorage.setItem('wallet_pwd', password);
+                    updateCardList();
+                } else {
+                    alert(data.error || '同步失败');
+                }
+            } catch (e) { alert('网络错误: ' + e.message); }
         }
 
-        function addAndRenderCard() {
+        async function addCard() {
+            const password = getPassword();
             const name = document.getElementById('cardName').value.trim();
             const number = document.getElementById('cardNumber').value.trim();
             const format = document.getElementById('cardFormat').value;
 
-            if (!name || !number) return alert("请输入卡片名称和卡号！");
+            if (!password) return alert('请先输入密码验证状态');
+            if (!name || !number) return alert('请完整填写卡片信息');
 
-            const cards = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-            cards.push({ name, number, format });
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
+            localCards.push({ name, number, format });
+            updateCardList();
+            renderBarcode(name, number, format);
 
             document.getElementById('cardName').value = '';
             document.getElementById('cardNumber').value = '';
 
-            updateCardList();
-            renderBarcode(name, number, format);
+            try {
+                const res = await fetch('/api/save-cards', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password, cards: localCards })
+                });
+                if (!res.ok) alert('保存到云端失败，请检查密码');
+            } catch (e) { alert('云端同步失败: ' + e.message); }
         }
 
         function updateCardList() {
-            const cards = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
             const listDiv = document.getElementById('card-list');
-            listDiv.innerHTML = cards.length === 0 ? '<p style="color: #999;">暂无卡片</p>' : '';
-
-            cards.forEach(card => {
-                const cardFormat = card.format || 'CODE128';
+            listDiv.innerHTML = localCards.length === 0 ? '<p style="color: #999;">暂无卡片，请先输入密码同步</p>' : '';
+            localCards.forEach((card) => {
                 const item = document.createElement('div');
                 item.className = 'card-item';
                 item.innerHTML = `
-                    <div>
-                        <strong>${card.name}</strong><br>
-                        <small style="color: #666;">${card.number} <span style="background:#eee;padding:2px 5px;border-radius:4px;font-size:10px;">${cardFormat}</span></small>
-                    </div>
-                    <button class="render-btn" onclick="renderBarcode('${card.name}', '${card.number}', '${cardFormat}')">显示</button>
+                    <div><strong>${card.name}</strong><br><small>${card.number} (${card.format})</small></div>
+                    <button class="render-btn" onclick="renderBarcode('${card.name}', '${card.number}', '${card.format}')">显示</button>
                 `;
                 listDiv.appendChild(item);
             });
         }
 
-        // --- GitHub API 交互 ---
-        async function uploadToGithub() {
-            const settings = JSON.parse(localStorage.getItem(GITHUB_CONFIG_KEY) || '{}');
-            if (!settings.token || !settings.gistId) return alert('请先配置 GitHub 信息');
-            const localData = localStorage.getItem(STORAGE_KEY) || '[]';
+        function renderBarcode(name, number, format) {
+            const container = document.getElementById('barcode-container');
+            document.getElementById('display-name').textContent = name;
+            container.style.display = 'block';
             try {
-                const response = await fetch(`https://api.github.com/gists/${settings.gistId}`, {
-                    method: 'PATCH',
-                    headers: { 'Authorization': `Bearer ${settings.token}`, 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ files: { 'cards.json': { content: localData } } })
-                });
-                if (response.ok) alert('上传成功！');
-                else alert('上传失败，请检查配置。');
-            } catch (e) { alert('网络错误: ' + e.message); }
-        }
-
-        async function downloadFromGithub() {
-            const settings = JSON.parse(localStorage.getItem(GITHUB_CONFIG_KEY) || '{}');
-            if (!settings.token || !settings.gistId) return;
-            try {
-                const response = await fetch(`https://api.github.com/gists/${settings.gistId}`, {
-                    method: 'GET',
-                    headers: { 'Authorization': `Bearer ${settings.token}` }
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    localStorage.setItem(STORAGE_KEY, data.files['cards.json'].content);
-                    updateCardList();
-                }
-            } catch (e) { console.error('静默恢复失败:', e); }
+                JsBarcode("#barcode-canvas", number, { format, lineColor: "#000", width: 2.5, height: 100, displayValue: true });
+            } catch (e) { alert('条码渲染失败，请检查卡号与格式是否匹配'); }
         }
     </script>
 </body>
