@@ -3,74 +3,144 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Card Wallet 备份原型</title>
+    <title>Card Wallet - 多格式版</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; padding: 20px; }
-        button, input::file-selector-button {
-            padding: 10px 15px; margin: 5px 0; border-radius: 8px;
-            border: 1px solid #ccc; background: #f0f0f0; font-size: 16px;
-        }
-        .primary { background: #000; color: #fff; border: none; }
-        pre { background: #eee; padding: 10px; border-radius: 8px; overflow-x: auto; }
+        body { font-family: -apple-system, sans-serif; padding: 20px; max-width: 500px; margin: 0 auto; }
+        input, select, button { padding: 10px; margin: 5px 0; border-radius: 8px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; font-size: 16px; background: white; }
+        .primary { background: #000; color: #fff; border: none; font-weight: bold; }
+        .secondary { background: #f0f0f0; }
+        .card-item { background: #f9f9f9; padding: 15px; margin-top: 10px; border-radius: 8px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
+        .render-btn { width: auto; background: #007aff; color: white; border: none; padding: 8px 15px; }
+        #barcode-container { text-align: center; margin: 20px 0; display: none; }
     </style>
 </head>
 <body>
 
-    <h2>我的卡包</h2>
+    <h2>添加新卡片</h2>
+    <input type="text" id="cardName" placeholder="例如: T&T Supermarket" />
+    <input type="number" id="cardNumber" placeholder="例如: 41012345678" />
+    
+    <!-- 新增：格式选择下拉菜单 -->
+    <select id="cardFormat">
+        <option value="UPC">UPC-A (需 11/12 位数字)</option>
+        <option value="CODE128">Code 128 (通用，支持任意长度)</option>
+        <option value="EAN13">EAN 13 (需 12/13 位数字)</option>
+        <option value="EAN8">EAN 8 (需 7/8 位数字)</option>
+        <option value="CODE39">Code 39</option>
+    </select>
 
-    <button onclick="addMockCard()">+ 添加一张 T&T 测试卡</button>
-    <button onclick="clearCards()">清空本地数据</button>
+    <button class="primary" onclick="addAndRenderCard()">保存并生成条形码</button>
 
-    <hr>
-
-    <h3>数据备份与恢复</h3>
-    <button class="primary" onclick="exportCards()">导出 JSON (存入 iCloud)</button>
-
-    <div style="margin-top: 15px;">
-        <label for="importFile" style="display:block; margin-bottom: 5px;">从 iCloud 恢复:</label>
-        <input type="file" id="importFile" accept=".json" onchange="importCards(event)">
+    <div id="barcode-container">
+        <h3 id="display-name"></h3>
+        <svg id="barcode-canvas"></svg>
     </div>
 
     <hr>
 
-    <h3>当前 localStorage 数据：</h3>
-    <pre id="display"></pre>
+    <h2>我的卡包</h2>
+    <div id="card-list"></div>
+
+    <hr>
+
+    <h3>数据备份 (iCloud)</h3>
+    <button class="secondary" onclick="exportCards()">1. 导出备份 (.json)</button>
+    <div style="margin-top: 10px;">
+        <label for="importFile" style="font-size: 14px; color: #666;">2. 从备份恢复:</label>
+        <input type="file" id="importFile" accept=".json" onchange="importCards(event)">
+    </div>
 
     <script>
         const STORAGE_KEY = 'my_cards_data';
 
-        function updateDisplay() {
-            const data = localStorage.getItem(STORAGE_KEY) || '[]';
-            document.getElementById('display').textContent = JSON.stringify(JSON.parse(data), null, 2);
+        // 接收 format 参数
+        function renderBarcode(name, number, format) {
+            const container = document.getElementById('barcode-container');
+            const nameDisplay = document.getElementById('display-name');
+            
+            nameDisplay.textContent = `${name} (${format})`;
+            container.style.display = 'block';
+
+            try {
+                // 根据传入的格式动态渲染
+                JsBarcode("#barcode-canvas", number, {
+                    format: format,
+                    lineColor: "#000",
+                    width: 2.5,
+                    height: 100,
+                    displayValue: true,
+                    fontSize: 20
+                });
+            } catch (e) {
+                // 捕获不符合特定格式长度要求的错误
+                alert(`无法生成 ${format} 格式的条形码。\n请检查卡号长度是否符合该格式的要求，或者改用通用的 Code 128 格式。`);
+                container.style.display = 'none';
+            }
         }
 
-        function addMockCard() {
+        function addAndRenderCard() {
+            const nameInput = document.getElementById('cardName');
+            const numberInput = document.getElementById('cardNumber');
+            const formatInput = document.getElementById('cardFormat'); // 获取格式
+            
+            const name = nameInput.value.trim();
+            const number = numberInput.value.trim();
+            const format = formatInput.value;
+
+            if (!name || !number) {
+                alert("请输入卡片名称和卡号！");
+                return;
+            }
+
             const cards = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-            cards.push({
-                name: "T&T Supermarket",
-                number: "410" + Math.floor(Math.random() * 100000000),
-                format: "CODE128"
-            });
+            // 保存时包含选中的格式
+            cards.push({ name: name, number: number, format: format });
             localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
-            updateDisplay();
+
+            nameInput.value = '';
+            numberInput.value = '';
+
+            updateCardList();
+            renderBarcode(name, number, format);
         }
 
-        function clearCards() {
-            localStorage.removeItem(STORAGE_KEY);
-            updateDisplay();
+        function updateCardList() {
+            const cards = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            const listDiv = document.getElementById('card-list');
+            listDiv.innerHTML = ''; 
+
+            if (cards.length === 0) {
+                listDiv.innerHTML = '<p style="color: #999;">暂无卡片</p>';
+                return;
+            }
+
+            cards.forEach(card => {
+                // 确保旧数据（没有 format 字段的）默认使用 CODE128
+                const cardFormat = card.format || 'CODE128'; 
+                const item = document.createElement('div');
+                item.className = 'card-item';
+                item.innerHTML = `
+                    <div>
+                        <strong>${card.name}</strong><br>
+                        <small style="color: #666;">${card.number} <span style="background:#eee;padding:2px 5px;border-radius:4px;font-size:10px;">${cardFormat}</span></small>
+                    </div>
+                    <button class="render-btn" onclick="renderBarcode('${card.name}', '${card.number}', '${cardFormat}')">显示</button>
+                `;
+                listDiv.appendChild(item);
+            });
         }
 
+        // 备份与恢复功能保持不变
         function exportCards() {
             const data = localStorage.getItem(STORAGE_KEY) || '[]';
             const blob = new Blob([data], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
-
             const a = document.createElement('a');
             a.href = url;
             a.download = 'my_cards_backup.json';
             document.body.appendChild(a);
             a.click();
-
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
@@ -78,27 +148,24 @@
         function importCards(event) {
             const file = event.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
                     const importedData = JSON.parse(e.target.result);
                     if (Array.isArray(importedData)) {
                         localStorage.setItem(STORAGE_KEY, JSON.stringify(importedData));
-                        updateDisplay();
+                        updateCardList();
                         alert('恢复成功！');
-                    } else {
-                        alert('数据格式错误：需为数组格式。');
                     }
                 } catch (err) {
                     alert('解析失败，请确保选择了正确的 JSON 文件。');
                 }
-                event.target.value = '';
+                event.target.value = ''; 
             };
             reader.readAsText(file);
         }
 
-        updateDisplay();
+        updateCardList();
     </script>
 </body>
 </html>
