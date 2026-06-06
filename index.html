@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Card Wallet 备份原型</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; padding: 20px; }
+        button, input::file-selector-button {
+            padding: 10px 15px; margin: 5px 0; border-radius: 8px;
+            border: 1px solid #ccc; background: #f0f0f0; font-size: 16px;
+        }
+        .primary { background: #000; color: #fff; border: none; }
+        pre { background: #eee; padding: 10px; border-radius: 8px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+
+    <h2>我的卡包</h2>
+
+    <button onclick="addMockCard()">+ 添加一张 T&T 测试卡</button>
+    <button onclick="clearCards()">清空本地数据</button>
+
+    <hr>
+
+    <h3>数据备份与恢复</h3>
+    <button class="primary" onclick="exportCards()">导出 JSON (存入 iCloud)</button>
+
+    <div style="margin-top: 15px;">
+        <label for="importFile" style="display:block; margin-bottom: 5px;">从 iCloud 恢复:</label>
+        <input type="file" id="importFile" accept=".json" onchange="importCards(event)">
+    </div>
+
+    <hr>
+
+    <h3>当前 localStorage 数据：</h3>
+    <pre id="display"></pre>
+
+    <script>
+        const STORAGE_KEY = 'my_cards_data';
+
+        function updateDisplay() {
+            const data = localStorage.getItem(STORAGE_KEY) || '[]';
+            document.getElementById('display').textContent = JSON.stringify(JSON.parse(data), null, 2);
+        }
+
+        function addMockCard() {
+            const cards = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            cards.push({
+                name: "T&T Supermarket",
+                number: "410" + Math.floor(Math.random() * 100000000),
+                format: "CODE128"
+            });
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
+            updateDisplay();
+        }
+
+        function clearCards() {
+            localStorage.removeItem(STORAGE_KEY);
+            updateDisplay();
+        }
+
+        function exportCards() {
+            const data = localStorage.getItem(STORAGE_KEY) || '[]';
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'my_cards_backup.json';
+            document.body.appendChild(a);
+            a.click();
+
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function importCards(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (Array.isArray(importedData)) {
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(importedData));
+                        updateDisplay();
+                        alert('恢复成功！');
+                    } else {
+                        alert('数据格式错误：需为数组格式。');
+                    }
+                } catch (err) {
+                    alert('解析失败，请确保选择了正确的 JSON 文件。');
+                }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        updateDisplay();
+    </script>
+</body>
+</html>
