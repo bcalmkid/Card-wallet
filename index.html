@@ -1,171 +1,98 @@
-<!DOCTYPE html>
-<html lang="zh">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Card Wallet - 多格式版</title>
-    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
-    <style>
-        body { font-family: -apple-system, sans-serif; padding: 20px; max-width: 500px; margin: 0 auto; }
-        input, select, button { padding: 10px; margin: 5px 0; border-radius: 8px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; font-size: 16px; background: white; }
-        .primary { background: #000; color: #fff; border: none; font-weight: bold; }
-        .secondary { background: #f0f0f0; }
-        .card-item { background: #f9f9f9; padding: 15px; margin-top: 10px; border-radius: 8px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
-        .render-btn { width: auto; background: #007aff; color: white; border: none; padding: 8px 15px; }
-        #barcode-container { text-align: center; margin: 20px 0; display: none; }
-    </style>
-</head>
-<body>
+    <hr>
 
-    <h2>添加新卡片</h2>
-    <input type="text" id="cardName" placeholder="例如: T&T Supermarket" />
-    <input type="number" id="cardNumber" placeholder="例如: 41012345678" />
-    
-    <!-- 新增：格式选择下拉菜单 -->
-    <select id="cardFormat">
-        <option value="UPC">UPC-A (需 11/12 位数字)</option>
-        <option value="CODE128">Code 128 (通用，支持任意长度)</option>
-        <option value="EAN13">EAN 13 (需 12/13 位数字)</option>
-        <option value="EAN8">EAN 8 (需 7/8 位数字)</option>
-        <option value="CODE39">Code 39</option>
-    </select>
-
-    <button class="primary" onclick="addAndRenderCard()">保存并生成条形码</button>
-
-    <div id="barcode-container">
-        <h3 id="display-name"></h3>
-        <svg id="barcode-canvas"></svg>
+    <h3>云端同步 (GitHub Gist)</h3>
+    <div style="background: #f0f0f0; padding: 15px; border-radius: 8px; margin-bottom: 10px;">
+        <input type="password" id="ghToken" placeholder="输入 GitHub Token (ghp_...)" />
+        <input type="text" id="ghGistId" placeholder="输入 Gist ID" />
+        <button class="primary" onclick="saveGithubSettings()">💾 保存 GitHub 配置到本地</button>
     </div>
 
-    <hr>
-
-    <h2>我的卡包</h2>
-    <div id="card-list"></div>
-
-    <hr>
-
-    <h3>数据备份 (iCloud)</h3>
-    <button class="secondary" onclick="exportCards()">1. 导出备份 (.json)</button>
-    <div style="margin-top: 10px;">
-        <label for="importFile" style="font-size: 14px; color: #666;">2. 从备份恢复:</label>
-        <input type="file" id="importFile" accept=".json" onchange="importCards(event)">
+    <div style="display: flex; gap: 10px;">
+        <button class="secondary" style="flex: 1;" onclick="uploadToGithub()">↑ 上传到云端</button>
+        <button class="secondary" style="flex: 1;" onclick="downloadFromGithub()">↓ 从云端恢复</button>
     </div>
 
     <script>
-        const STORAGE_KEY = 'my_cards_data';
+        // ... (保留你之前的 JS 代码，例如 renderBarcode, addAndRenderCard, updateCardList) ...
 
-        // 接收 format 参数
-        function renderBarcode(name, number, format) {
-            const container = document.getElementById('barcode-container');
-            const nameDisplay = document.getElementById('display-name');
-            
-            nameDisplay.textContent = `${name} (${format})`;
-            container.style.display = 'block';
+        // --- GitHub 同步逻辑 ---
+        const GITHUB_CONFIG_KEY = 'github_settings';
+
+        // 页面加载时自动填入保存的配置
+        function loadGithubSettings() {
+            const settings = JSON.parse(localStorage.getItem(GITHUB_CONFIG_KEY) || '{}');
+            if (settings.token) document.getElementById('ghToken').value = settings.token;
+            if (settings.gistId) document.getElementById('ghGistId').value = settings.gistId;
+        }
+
+        function saveGithubSettings() {
+            const token = document.getElementById('ghToken').value.trim();
+            const gistId = document.getElementById('ghGistId').value.trim();
+            localStorage.setItem(GITHUB_CONFIG_KEY, JSON.stringify({ token, gistId }));
+            alert('GitHub 配置已保存在本地！');
+        }
+
+        async function uploadToGithub() {
+            const settings = JSON.parse(localStorage.getItem(GITHUB_CONFIG_KEY) || '{}');
+            if (!settings.token || !settings.gistId) return alert('请先填写并保存 GitHub 配置');
+
+            const localData = localStorage.getItem(STORAGE_KEY) || '[]';
 
             try {
-                // 根据传入的格式动态渲染
-                JsBarcode("#barcode-canvas", number, {
-                    format: format,
-                    lineColor: "#000",
-                    width: 2.5,
-                    height: 100,
-                    displayValue: true,
-                    fontSize: 20
+                const response = await fetch(`https://api.github.com/gists/${settings.gistId}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${settings.token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            'cards.json': { content: localData }
+                        }
+                    })
                 });
-            } catch (e) {
-                // 捕获不符合特定格式长度要求的错误
-                alert(`无法生成 ${format} 格式的条形码。\n请检查卡号长度是否符合该格式的要求，或者改用通用的 Code 128 格式。`);
-                container.style.display = 'none';
-            }
-        }
 
-        function addAndRenderCard() {
-            const nameInput = document.getElementById('cardName');
-            const numberInput = document.getElementById('cardNumber');
-            const formatInput = document.getElementById('cardFormat'); // 获取格式
-            
-            const name = nameInput.value.trim();
-            const number = numberInput.value.trim();
-            const format = formatInput.value;
-
-            if (!name || !number) {
-                alert("请输入卡片名称和卡号！");
-                return;
-            }
-
-            const cards = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-            // 保存时包含选中的格式
-            cards.push({ name: name, number: number, format: format });
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
-
-            nameInput.value = '';
-            numberInput.value = '';
-
-            updateCardList();
-            renderBarcode(name, number, format);
-        }
-
-        function updateCardList() {
-            const cards = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-            const listDiv = document.getElementById('card-list');
-            listDiv.innerHTML = ''; 
-
-            if (cards.length === 0) {
-                listDiv.innerHTML = '<p style="color: #999;">暂无卡片</p>';
-                return;
-            }
-
-            cards.forEach(card => {
-                // 确保旧数据（没有 format 字段的）默认使用 CODE128
-                const cardFormat = card.format || 'CODE128'; 
-                const item = document.createElement('div');
-                item.className = 'card-item';
-                item.innerHTML = `
-                    <div>
-                        <strong>${card.name}</strong><br>
-                        <small style="color: #666;">${card.number} <span style="background:#eee;padding:2px 5px;border-radius:4px;font-size:10px;">${cardFormat}</span></small>
-                    </div>
-                    <button class="render-btn" onclick="renderBarcode('${card.name}', '${card.number}', '${cardFormat}')">显示</button>
-                `;
-                listDiv.appendChild(item);
-            });
-        }
-
-        // 备份与恢复功能保持不变
-        function exportCards() {
-            const data = localStorage.getItem(STORAGE_KEY) || '[]';
-            const blob = new Blob([data], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'my_cards_backup.json';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        function importCards(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const importedData = JSON.parse(e.target.result);
-                    if (Array.isArray(importedData)) {
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(importedData));
-                        updateCardList();
-                        alert('恢复成功！');
-                    }
-                } catch (err) {
-                    alert('解析失败，请确保选择了正确的 JSON 文件。');
+                if (response.ok) {
+                    alert('上传成功！数据已备份至 GitHub。');
+                } else {
+                    alert('上传失败，请检查 Token 或 Gist ID 是否正确。');
                 }
-                event.target.value = ''; 
-            };
-            reader.readAsText(file);
+            } catch (e) {
+                alert('网络错误：' + e.message);
+            }
         }
 
-        updateCardList();
+        async function downloadFromGithub() {
+            const settings = JSON.parse(localStorage.getItem(GITHUB_CONFIG_KEY) || '{}');
+            if (!settings.token || !settings.gistId) return alert('请先填写并保存 GitHub 配置');
+
+            try {
+                const response = await fetch(`https://api.github.com/gists/${settings.gistId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${settings.token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const cloudContent = data.files['cards.json'].content;
+                    
+                    // 覆写本地数据并刷新
+                    localStorage.setItem(STORAGE_KEY, cloudContent);
+                    updateCardList();
+                    alert('恢复成功！已从 GitHub 拉取最新数据。');
+                } else {
+                    alert('下载失败，请检查 Token 或 Gist ID 是否正确。');
+                }
+            } catch (e) {
+                alert('网络错误：' + e.message);
+            }
+        }
+
+        // 初始化
+        loadGithubSettings();
+        // updateCardList(); // 确保保留之前的初始化调用
     </script>
-</body>
-</html>
