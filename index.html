@@ -110,10 +110,9 @@
             localCards.forEach((card) => {
                 const item = document.createElement('div');
                 item.className = 'card-item';
-                item.innerHTML = `
-                    <div><strong>${card.name}</strong><br><small>${card.number} (${card.format})</small></div>
-                    <button class="render-btn" onclick="renderBarcode('${card.name}', '${card.number}', '${card.format}')">显示</button>
-                `;
+                item.innerHTML =
+                    '<div><strong>' + card.name + '</strong><br><small>' + card.number + ' (' + card.format + ')</small></div>' +
+                    '<button class="render-btn" onclick="renderBarcode(\'' + card.name + '\', \'' + card.number + '\', \'' + card.format + '\')">显示</button>';
                 listDiv.appendChild(item);
             });
         }
@@ -123,7 +122,7 @@
             document.getElementById('display-name').textContent = name;
             container.style.display = 'block';
             try {
-                JsBarcode("#barcode-canvas", number, { format, lineColor: "#000", width: 2.5, height: 100, displayValue: true });
+                JsBarcode("#barcode-canvas", number, { format: format, lineColor: "#000", width: 2.5, height: 100, displayValue: true });
             } catch (e) { alert('条码渲染失败，请检查卡号与格式是否匹配'); }
         }
     </script>
