@@ -67,6 +67,35 @@
         }
         #toast.show { opacity: 1; }
 
+        /* ── Modal / Dialog ── */
+        #delete-modal {
+            display: none;
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,.5);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+        }
+        #delete-modal.show { display: flex; }
+        .modal-content {
+            background: #fff;
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 280px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,.2);
+        }
+        .modal-content h3 { font-size: 16px; margin-bottom: 8px; }
+        .modal-content p { font-size: 14px; color: #636366; margin-bottom: 16px; }
+        .modal-buttons { display: flex; gap: 10px; }
+        .modal-buttons button {
+            flex: 1; padding: 11px;
+            border: none; border-radius: 10px;
+            font-size: 14px; font-weight: 600; cursor: pointer;
+        }
+        .btn-confirm { background: #ff3b30; color: #fff; }
+        .btn-cancel { background: #f2f2f7; color: #1c1c1e; }
+
         /* ── Section card ── */
         .section {
             background: #fff;
@@ -81,71 +110,27 @@
             padding: 12px 16px 6px;
         }
 
-        /* ── Auth ── */
-        .auth-row {
-            display: flex; gap: 8px; padding: 12px 16px;
-            border-top: 1px solid #f2f2f7;
-        }
-        .auth-row input {
-            flex: 1; padding: 10px 12px;
-            border: 1px solid #e5e5ea; border-radius: 10px;
-            font-size: 15px; background: #f9f9fb;
-            outline: none;
-        }
-        .auth-row input:focus { border-color: #007aff; }
-        .btn-sync {
-            padding: 10px 16px; border-radius: 10px;
-            background: #007aff; color: #fff;
-            border: none; font-size: 15px; font-weight: 600;
-            cursor: pointer; white-space: nowrap;
-        }
-        .btn-sync:active { opacity: 0.8; }
-
-        /* ── Add card form ── */
-        .form-field {
-            padding: 0 16px 4px;
-        }
-        .form-field + .form-field { border-top: 1px solid #f2f2f7; }
-        .form-field input, .form-field select {
-            width: 100%; padding: 12px 0;
-            border: none; font-size: 16px; background: transparent;
-            outline: none; color: #1c1c1e;
-            -webkit-appearance: none;
-        }
-        .form-field select { color: #1c1c1e; }
-        .btn-add {
-            display: block; width: calc(100% - 32px);
-            margin: 12px 16px; padding: 13px;
-            background: #000; color: #fff;
-            border: none; border-radius: 12px;
-            font-size: 16px; font-weight: 600; cursor: pointer;
-        }
-        .btn-add:active { opacity: 0.75; }
-
-        /* ── Barcode panel ── */
-        #barcode-container {
+        /* ── Undo banner ── */
+        #undo-banner {
             display: none;
-            padding: 20px 16px;
-            text-align: center;
-            border-top: 1px solid #f2f2f7;
+            background: #fff3cd;
+            border-top: 1px solid #ffe5a0;
+            padding: 12px 16px;
+            margin: 16px 16px 0;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
         }
-        #barcode-container.visible { display: block; }
-        #display-name { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
-        #barcode-canvas { max-width: 100%; }
-        .barcode-actions {
-            display: flex; gap: 8px; justify-content: center; margin-top: 12px;
+        #undo-banner.show { display: flex; }
+        .undo-text { flex: 1; font-size: 14px; color: #856404; }
+        .btn-undo {
+            padding: 8px 14px; border-radius: 8px;
+            background: #ffc107; color: #333; border: none;
+            font-size: 13px; font-weight: 600; cursor: pointer;
+            white-space: nowrap;
         }
-        .btn-close-barcode {
-            padding: 8px 20px;
-            background: #f2f2f7; border: none; border-radius: 8px;
-            font-size: 14px; color: #636366; cursor: pointer;
-        }
-        .btn-brightness {
-            padding: 8px 14px; border-radius: 8px; border: none;
-            font-size: 14px; font-weight: 500; cursor: pointer;
-        }
-        .btn-brightness.max { background: #fff3cd; color: #856404; }
-        .btn-brightness.restore { background: #d1f5e0; color: #1c8a3f; display: none; }
 
         /* ── Card list items ── */
         .card-item {
@@ -177,6 +162,116 @@
             background: #fff3cd; color: #856404;
             padding: 2px 7px; border-radius: 6px; margin-left: 6px;
         }
+
+        /* ── Add card form (collapsible) ── */
+        .btn-add-main {
+            display: block; width: calc(100% - 32px);
+            margin: 12px 16px; padding: 13px;
+            background: #000; color: #fff;
+            border: none; border-radius: 12px;
+            font-size: 16px; font-weight: 600; cursor: pointer;
+        }
+        .btn-add-main:active { opacity: 0.75; }
+
+        #add-form {
+            display: none;
+            padding: 12px 16px;
+            border-top: 1px solid #f2f2f7;
+        }
+        #add-form.show { display: block; }
+
+        .form-field {
+            padding: 0 0 4px;
+        }
+        .form-field + .form-field { border-top: 1px solid #f2f2f7; padding-top: 4px; }
+        .form-field input, .form-field select {
+            width: 100%; padding: 12px 0;
+            border: none; font-size: 16px; background: transparent;
+            outline: none; color: #1c1c1e;
+            -webkit-appearance: none;
+        }
+        .form-field select { color: #1c1c1e; }
+
+        .form-actions {
+            display: flex; gap: 8px; margin-top: 12px;
+        }
+        .btn-save {
+            flex: 1; padding: 11px;
+            background: #000; color: #fff;
+            border: none; border-radius: 10px;
+            font-size: 14px; font-weight: 600; cursor: pointer;
+        }
+        .btn-cancel-form {
+            flex: 1; padding: 11px;
+            background: #f2f2f7; color: #1c1c1e;
+            border: none; border-radius: 10px;
+            font-size: 14px; font-weight: 600; cursor: pointer;
+        }
+
+        /* ── Barcode panel ── */
+        #barcode-container {
+            display: none;
+            padding: 20px 16px;
+            text-align: center;
+            border-top: 1px solid #f2f2f7;
+        }
+        #barcode-container.visible { display: block; }
+        #display-name { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+        #barcode-canvas { max-width: 100%; }
+        .barcode-actions {
+            display: flex; gap: 8px; justify-content: center; margin-top: 12px;
+        }
+        .btn-close-barcode {
+            padding: 8px 20px;
+            background: #f2f2f7; border: none; border-radius: 8px;
+            font-size: 14px; color: #636366; cursor: pointer;
+        }
+        .btn-brightness {
+            padding: 8px 14px; border-radius: 8px; border: none;
+            font-size: 14px; font-weight: 500; cursor: pointer;
+        }
+        .btn-brightness.max { background: #fff3cd; color: #856404; }
+        .btn-brightness.restore { background: #d1f5e0; color: #1c8a3f; display: none; }
+
+        /* ── Trash / Recovery ── */
+        #trash-section {
+            display: none;
+        }
+        #trash-section.show { display: block; }
+        .trash-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 16px;
+        }
+        .trash-item + .trash-item { border-top: 1px solid #f2f2f7; }
+        .trash-info { flex: 1; }
+        .trash-info strong { font-size: 14px; color: #1c1c1e; }
+        .trash-info small { display: block; font-size: 12px; color: #8e8e93; margin-top: 2px; }
+        .btn-recover {
+            padding: 6px 12px; border-radius: 8px;
+            background: #d1f5e0; color: #1c8a3f;
+            border: none; font-size: 13px; font-weight: 600; cursor: pointer;
+        }
+        .btn-recover:active { opacity: 0.75; }
+
+        /* ── Settings section (sync) ── */
+        .auth-row {
+            display: flex; gap: 8px; padding: 12px 16px;
+            border-top: 1px solid #f2f2f7;
+        }
+        .auth-row input {
+            flex: 1; padding: 10px 12px;
+            border: 1px solid #e5e5ea; border-radius: 10px;
+            font-size: 15px; background: #f9f9fb;
+            outline: none;
+        }
+        .auth-row input:focus { border-color: #007aff; }
+        .btn-sync {
+            padding: 10px 16px; border-radius: 10px;
+            background: #007aff; color: #fff;
+            border: none; font-size: 15px; font-weight: 600;
+            cursor: pointer; white-space: nowrap;
+        }
+        .btn-sync:active { opacity: 0.8; }
     </style>
 </head>
 <body>
@@ -193,32 +288,36 @@
 
 <div id="toast"></div>
 
-<!-- Auth -->
-<div class="section">
-    <div class="section-title">云端同步</div>
-    <div class="auth-row">
-        <input type="password" id="appPassword" placeholder="访问密码" autocomplete="current-password" />
-        <button class="btn-sync" onclick="syncFromServer()">同步</button>
+<!-- Delete confirmation modal -->
+<div id="delete-modal">
+    <div class="modal-content">
+        <h3>删除卡片？</h3>
+        <p id="modal-card-name"></p>
+        <div class="modal-buttons">
+            <button class="btn-confirm" onclick="confirmDelete()">删除</button>
+            <button class="btn-cancel" onclick="cancelDelete()">取消</button>
+        </div>
     </div>
 </div>
 
-<!-- Add card -->
+<!-- Undo banner -->
+<div id="undo-banner">
+    <span class="undo-text" id="undo-text">卡片已删除</span>
+    <button class="btn-undo" onclick="undoDelete()">撤销</button>
+</div>
+
+<!-- Main: Card list (top) -->
 <div class="section">
-    <div class="section-title">添加新卡片</div>
-    <div class="form-field">
-        <input type="text" id="cardName" placeholder="卡片名称，例如 T&T Supermarket" />
+    <div class="section-title" id="list-title">卡包</div>
+    <div id="card-list">
+        <div class="empty-state">暂无卡片</div>
     </div>
-    <div class="form-field">
-        <input type="number" id="cardNumber" placeholder="卡号，例如 41012345678" />
-    </div>
-    <div class="form-field">
-        <select id="cardFormat">
-            <option value="CODE128">Code 128（通用，推荐）</option>
-            <option value="UPC">UPC-A（需 11/12 位数字）</option>
-            <option value="EAN13">EAN-13（需 12/13 位数字）</option>
-        </select>
-    </div>
-    <button class="btn-add" onclick="addCard()">+ 保存并同步到云端</button>
+</div>
+
+<!-- Trash / Recovery -->
+<div class="section" id="trash-section">
+    <div class="section-title">回收站</div>
+    <div id="trash-list"></div>
 </div>
 
 <!-- Barcode display -->
@@ -234,11 +333,36 @@
     </div>
 </div>
 
-<!-- Card list -->
+<!-- Add card (collapsible) -->
 <div class="section">
-    <div class="section-title" id="list-title">卡包</div>
-    <div id="card-list">
-        <div class="empty-state">暂无卡片</div>
+    <button class="btn-add-main" onclick="toggleAddForm()">+ 添加新卡片</button>
+    <div id="add-form">
+        <div class="form-field">
+            <input type="text" id="cardName" placeholder="卡片名称，例如 T&T Supermarket" />
+        </div>
+        <div class="form-field">
+            <input type="number" id="cardNumber" placeholder="卡号，例如 41012345678" />
+        </div>
+        <div class="form-field">
+            <select id="cardFormat">
+                <option value="CODE128">Code 128（通用，推荐）</option>
+                <option value="UPC">UPC-A（需 11/12 位数字）</option>
+                <option value="EAN13">EAN-13（需 12/13 位数字）</option>
+            </select>
+        </div>
+        <div class="form-actions">
+            <button class="btn-save" onclick="addCard()">保存</button>
+            <button class="btn-cancel-form" onclick="toggleAddForm()">取消</button>
+        </div>
+    </div>
+</div>
+
+<!-- Settings: Sync / Auth (bottom) -->
+<div class="section">
+    <div class="section-title">云端同步</div>
+    <div class="auth-row">
+        <input type="password" id="appPassword" placeholder="访问密码" autocomplete="current-password" />
+        <button class="btn-sync" onclick="syncFromServer()">同步</button>
     </div>
 </div>
 
@@ -246,13 +370,18 @@
     const CACHE_KEY   = 'cw_cards_cache';
     const CACHE_TS_KEY = 'cw_cache_ts';
     const PWD_KEY     = 'wallet_pwd';
+    const TRASH_KEY   = 'cw_trash';
 
     let localCards = [];
     let fromCache  = false;
+    let trash      = [];
+    let deleteTimer = null;
+    let pendingDelete = null;
 
     // ── Boot ──────────────────────────────────────────────────
     window.onload = function () {
-        // Show cached cards immediately
+        loadTrash();
+
         const cached = localStorage.getItem(CACHE_KEY);
         if (cached) {
             try {
@@ -264,7 +393,6 @@
             } catch (e) { /* ignore */ }
         }
 
-        // Auto-sync if password is saved
         const savedPwd = localStorage.getItem(PWD_KEY);
         if (savedPwd) {
             document.getElementById('appPassword').value = savedPwd;
@@ -329,7 +457,15 @@
         }
     }
 
-    // ── Add card ──────────────────────────────────────────────
+    // ── Add card form (collapsible) ───────────────────────────
+    function toggleAddForm() {
+        const form = document.getElementById('add-form');
+        form.classList.toggle('show');
+        if (form.classList.contains('show')) {
+            document.getElementById('cardName').focus();
+        }
+    }
+
     async function addCard() {
         const password = document.getElementById('appPassword').value.trim();
         const name     = document.getElementById('cardName').value.trim();
@@ -343,9 +479,9 @@
         localCards.push(card);
         fromCache = false;
         renderCards();
-        renderBarcode(name, number, format);
         document.getElementById('cardName').value  = '';
         document.getElementById('cardNumber').value = '';
+        toggleAddForm();
         saveCache();
 
         setSyncPill('syncing', '保存中…');
@@ -368,16 +504,73 @@
         }
     }
 
-    // ── Delete card ───────────────────────────────────────────
-    async function deleteCard(index) {
+    // ── Delete card (with undo) ───────────────────────────────
+    function deleteCard(index) {
+        pendingDelete = index;
+        document.getElementById('modal-card-name').textContent = localCards[index].name;
+        document.getElementById('delete-modal').classList.add('show');
+    }
+
+    function cancelDelete() {
+        document.getElementById('delete-modal').classList.remove('show');
+        pendingDelete = null;
+    }
+
+    async function confirmDelete() {
+        document.getElementById('delete-modal').classList.remove('show');
+        const index = pendingDelete;
+        pendingDelete = null;
+
         const password = document.getElementById('appPassword').value.trim();
+        const card = localCards[index];
+
+        // Move to trash
+        trash.unshift({ ...card, deletedAt: Date.now() });
+        saveTrash();
+
+        // Remove from cards
         localCards.splice(index, 1);
         renderCards();
         saveCache();
 
-        if (!password) { toast('已从本地删除，请同步到云端'); return; }
+        // Show undo banner
+        document.getElementById('undo-text').textContent = '已删除"' + escHtml(card.name) + '"';
+        document.getElementById('undo-banner').classList.add('show');
 
-        setSyncPill('syncing', '保存中…');
+        // Start 5s undo window
+        if (deleteTimer) clearTimeout(deleteTimer);
+        deleteTimer = setTimeout(() => {
+            if (pendingUndo) {
+                permanentlyDelete(password);
+            }
+        }, 5000);
+
+        let pendingUndo = true;
+        const undoban = document.getElementById('undo-banner');
+        undoban.querySelector('.btn-undo').onclick = () => {
+            pendingUndo = false;
+            clearTimeout(deleteTimer);
+            undoDelete();
+        };
+    }
+
+    function undoDelete() {
+        if (trash.length === 0) return;
+        const card = trash.shift();
+        saveTrash();
+        localCards.push(card);
+        renderCards();
+        saveCache();
+        document.getElementById('undo-banner').classList.remove('show');
+        clearTimeout(deleteTimer);
+        toast('已恢复');
+    }
+
+    async function permanentlyDelete(password) {
+        if (!password) return;
+        document.getElementById('undo-banner').classList.remove('show');
+
+        setSyncPill('syncing', '删除中…');
         try {
             const res = await fetch('/api/save-cards', {
                 method: 'POST',
@@ -386,15 +579,64 @@
             });
             if (res.ok) {
                 setSyncPill('ok', '已同步 ✓');
-                toast('卡片已删除');
+                trash = [];
+                saveTrash();
             } else {
-                setSyncPill('error', '保存失败');
-                toast('本地已删除，云端保存失败');
+                setSyncPill('error', '删除失败');
             }
         } catch (e) {
             setSyncPill('error', '网络错误');
-            toast('本地已删除，请稍后重新同步');
         }
+    }
+
+    function recoverFromTrash(index) {
+        const card = trash[index];
+        trash.splice(index, 1);
+        saveTrash();
+        localCards.push(card);
+        renderCards();
+        saveCache();
+        toast('已恢复"' + escHtml(card.name) + '"');
+    }
+
+    // ── Trash ─────────────────────────────────────────────────
+    function saveTrash() {
+        localStorage.setItem(TRASH_KEY, JSON.stringify(trash));
+        renderTrash();
+    }
+
+    function loadTrash() {
+        const saved = localStorage.getItem(TRASH_KEY);
+        if (saved) {
+            try {
+                trash = JSON.parse(saved);
+            } catch (e) { trash = []; }
+        }
+        renderTrash();
+    }
+
+    function renderTrash() {
+        const section = document.getElementById('trash-section');
+        const list    = document.getElementById('trash-list');
+
+        if (trash.length === 0) {
+            section.classList.remove('show');
+            return;
+        }
+
+        section.classList.add('show');
+        list.innerHTML = '';
+        trash.forEach((card, i) => {
+            const item = document.createElement('div');
+            item.className = 'trash-item';
+            item.innerHTML =
+                '<div class="trash-info">' +
+                    '<strong>' + escHtml(card.name) + '</strong>' +
+                    '<small>' + escHtml(card.number) + ' · ' + card.format + '</small>' +
+                '</div>' +
+                '<button class="btn-recover" onclick="recoverFromTrash(' + i + ')">恢复</button>';
+            list.appendChild(item);
+        });
     }
 
     // ── Local cache ───────────────────────────────────────────
@@ -403,7 +645,7 @@
         localStorage.setItem(CACHE_TS_KEY, Date.now());
     }
 
-    // ── Render ────────────────────────────────────────────────
+    // ── Render cards ──────────────────────────────────────────
     function renderCards() {
         const listDiv = document.getElementById('card-list');
         const title   = document.getElementById('list-title');
@@ -459,7 +701,6 @@
     let prevBrightness = null;
 
     function setBrightMax() {
-        // Capture current filter (if any) so we can restore it
         prevBrightness = document.documentElement.style.filter || '';
         document.documentElement.style.filter = 'brightness(2)';
         document.getElementById('btn-bright-max').style.display     = 'none';
